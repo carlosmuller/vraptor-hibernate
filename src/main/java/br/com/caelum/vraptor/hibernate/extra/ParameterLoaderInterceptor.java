@@ -20,6 +20,7 @@ import br.com.caelum.vraptor.*;
 import br.com.caelum.vraptor.controller.ControllerMethod;
 import br.com.caelum.vraptor.converter.Converter;
 import br.com.caelum.vraptor.core.*;
+import br.com.caelum.vraptor.http.*;
 import br.com.caelum.vraptor.interceptor.Interceptor;
 import br.com.caelum.vraptor.view.FlashScope;
 import com.google.common.collect.Iterables;
@@ -28,7 +29,6 @@ import org.hibernate.type.Type;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
-import javax.validation.ParameterNameProvider;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -83,15 +83,14 @@ public class ParameterLoaderInterceptor implements Interceptor {
 	public void intercept(InterceptorStack stack, ControllerMethod method, Object resourceInstance)
 			throws InterceptionException {
 		Annotation[][] annotations = method.getMethod().getParameterAnnotations();
-
-		final List<String> names = provider.getParameterNames(method.getMethod());
+		final Parameter[] parameters = provider.parametersFor(method.getMethod());
 		final Class<?>[] types = method.getMethod().getParameterTypes();
 		final Object[] args = flash.consumeParameters(method);
 
-		for (int i = 0; i < names.size(); i++) {
+		for (int i = 0; i < parameters.length; i++) {
 			if (hasLoadAnnotation(annotations[i])) {
-				String parameterName = names.get(i);
-				Object loaded = load(parameterName, types[i]);
+				Parameter parameter = parameters[i];
+				Object loaded = load(parameter.getName(), types[i]);
 
 				// TODO extract to method, so users can override behaviour
 				if (loaded == null) {
@@ -102,7 +101,7 @@ public class ParameterLoaderInterceptor implements Interceptor {
 				if (args != null) {
 					args[i] = loaded;
 				} else {
-					request.setAttribute(parameterName, loaded);
+					request.setAttribute(parameter.getName(), loaded);
 				}
 			}
 		}

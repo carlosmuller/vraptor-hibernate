@@ -51,7 +51,7 @@ public class ParameterLoaderTest {
     private @Mock Converters converters;
     private @Mock FlashScope flash;
 
-    private ParameterLoader parameterLoader;
+    private ParameterLoaderInterceptor parameterLoader;
     private @Mock InterceptorStack stack;
     private @Mock Object instance;
     private @Mock ControllerMethod method;
@@ -60,7 +60,7 @@ public class ParameterLoaderTest {
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
-        parameterLoader = new ParameterLoader(session, request, provider, result, converters, flash);
+        parameterLoader = new ParameterLoaderInterceptor(session, request, provider, result, converters, flash);
         when(method.getMethod()).thenReturn(getMethod("method", Entity.class));
         when(converters.to(Long.class)).thenReturn(new LongConverter());
         when(converters.to(String.class)).thenReturn(new StringConverter());
