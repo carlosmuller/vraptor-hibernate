@@ -46,8 +46,7 @@ import static java.util.Arrays.asList;
  * @since 3.4.0
  *
  */
-@Intercepts//(before=ParametersInstantiatorInterceptor.class)->> para onde foi ou o que é
-//@Lazy -> priority?
+@Intercepts
 public class ParameterLoaderInterceptor implements Interceptor {
 
 	private final Session session;
@@ -68,7 +67,7 @@ public class ParameterLoaderInterceptor implements Interceptor {
 
 	@Inject
 	public ParameterLoaderInterceptor(Session session, HttpServletRequest request, ParameterNameProvider provider,
-									  Result result, Converters converters/*, Localization localization*/, FlashScope flash) {
+									  Result result, Converters converters, FlashScope flash) {
 		this.session = session;
 		this.request = request;
 		this.provider = provider;
