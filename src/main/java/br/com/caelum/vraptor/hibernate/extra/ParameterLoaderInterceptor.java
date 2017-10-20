@@ -19,10 +19,11 @@ package br.com.caelum.vraptor.hibernate.extra;
 import br.com.caelum.vraptor.*;
 import br.com.caelum.vraptor.controller.ControllerMethod;
 import br.com.caelum.vraptor.converter.Converter;
-import br.com.caelum.vraptor.core.*;
+import br.com.caelum.vraptor.core.Converters;
 import br.com.caelum.vraptor.http.*;
-import br.com.caelum.vraptor.interceptor.Interceptor;
+import br.com.caelum.vraptor.interceptor.*;
 import br.com.caelum.vraptor.view.FlashScope;
+import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import org.hibernate.Session;
 import org.hibernate.type.Type;
@@ -31,9 +32,10 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
-import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Predicates.instanceOf;
+import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.isEmpty;
 import static java.util.Arrays.asList;
 
@@ -47,7 +49,7 @@ import static java.util.Arrays.asList;
  *
  */
 @Intercepts
-public class ParameterLoaderInterceptor implements Interceptor {
+public class ParameterLoaderInterceptor{
 
 	private final Session session;
 	private final HttpServletRequest request;
@@ -76,11 +78,13 @@ public class ParameterLoaderInterceptor implements Interceptor {
 		this.flash = flash;
 	}
 
+	@Accepts
 	public boolean accepts(ControllerMethod method) {
-		return method.containsAnnotation(Load.class);
+		return any(asList(method.getMethod().getParameterAnnotations()), hasAnnotation(Load.class));
 	}
 
-	public void intercept(InterceptorStack stack, ControllerMethod method, Object resourceInstance)
+	@AroundCall
+	public void intercept(SimpleInterceptorStack stack, ControllerMethod method)
 			throws InterceptionException {
 		Annotation[][] annotations = method.getMethod().getParameterAnnotations();
 		final Parameter[] parameters = provider.parametersFor(method.getMethod());
@@ -107,7 +111,7 @@ public class ParameterLoaderInterceptor implements Interceptor {
 		}
 
 		flash.includeParameters(method, args);
-		stack.next(method, resourceInstance);
+		stack.next();
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -122,11 +126,19 @@ public class ParameterLoaderInterceptor implements Interceptor {
 
 		Type idType = session.getSessionFactory().getClassMetadata(type).getIdentifierType();
 		Converter<?> converter = converters.to(idType.getReturnedClass());
-		checkArgument(converter != null, "Entity %s id type %s must have a converter",
-				type.getSimpleName(), idType);
+		checkArgument(converter != null, "Entity %s id type %s must have a converter", type.getSimpleName(), idType);
 
 		Serializable id = (Serializable) converter.convert(parameter, type);
 		return session.get(type, id);
+	}
+
+	private Predicate<? super Annotation[]> hasAnnotation(final Class<Load> annotation) {
+		return new Predicate<Annotation[]>() {
+			@Override
+			public boolean apply(Annotation[] annotations) {
+				return hasLoadAnnotation(annotations);
+			}
+		};
 	}
 
 	private boolean hasLoadAnnotation(Annotation[] annotations) {

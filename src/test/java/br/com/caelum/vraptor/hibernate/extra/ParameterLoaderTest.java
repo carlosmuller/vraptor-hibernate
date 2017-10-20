@@ -1,43 +1,29 @@
 package br.com.caelum.vraptor.hibernate.extra;
 
+import br.com.caelum.vraptor.Result;
+import br.com.caelum.vraptor.controller.ControllerMethod;
+import br.com.caelum.vraptor.converter.*;
+import br.com.caelum.vraptor.core.*;
+import br.com.caelum.vraptor.http.*;
+import br.com.caelum.vraptor.interceptor.SimpleInterceptorStack;
+import br.com.caelum.vraptor.view.FlashScope;
+import org.hibernate.*;
+import org.hibernate.metadata.ClassMetadata;
+import org.hibernate.type.Type;
+import org.junit.*;
+import org.mockito.*;
+import org.mockito.stubbing.Stubber;
+
+import javax.persistence.Id;
+import javax.servlet.http.HttpServletRequest;
+import java.lang.reflect.Method;
+import java.util.*;
+
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.List;
-
-import javax.persistence.Id;
-import javax.servlet.http.HttpServletRequest;
-
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.metadata.ClassMetadata;
-import org.hibernate.type.Type;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
-import org.mockito.stubbing.Stubber;
-
-import br.com.caelum.vraptor.Result;
-import br.com.caelum.vraptor.controller.ControllerMethod;
-import br.com.caelum.vraptor.converter.LongConverter;
-import br.com.caelum.vraptor.converter.StringConverter;
-import br.com.caelum.vraptor.core.Converters;
-import br.com.caelum.vraptor.core.InterceptorStack;
-import br.com.caelum.vraptor.events.ControllerFound;
-import br.com.caelum.vraptor.http.Parameter;
-import br.com.caelum.vraptor.http.ParameterNameProvider;
-import br.com.caelum.vraptor.view.FlashScope;
+import static org.mockito.Mockito.*;
 
 public class ParameterLoaderTest {
 
@@ -55,7 +41,8 @@ public class ParameterLoaderTest {
     private @Mock InterceptorStack stack;
     private @Mock Object instance;
     private @Mock ControllerMethod method;
-    
+    private SimpleInterceptorStack simpleInterceptorStack = mock(SimpleInterceptorStack.class);
+
 
     @Before
     public void setUp() throws Exception {
@@ -81,7 +68,7 @@ public class ParameterLoaderTest {
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
 
         verify(request).setAttribute("entity", expectedEntity);
     }
@@ -91,18 +78,18 @@ public class ParameterLoaderTest {
     	when(method.getMethod()).thenReturn(getMethod("methodOtherIdName", EntityOtherIdName.class));
     	Parameter[] mocks = mockParameters(Arrays.asList("entity"));
 		when(provider.parametersFor(method.getMethod())).thenReturn(mocks);
-		
+
         when(request.getParameter("entity.otherIdName")).thenReturn("456");
         EntityOtherIdName expectedEntity = new EntityOtherIdName();
         when(session.get(EntityOtherIdName.class, 456L)).thenReturn(expectedEntity);
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn("otherIdName");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
         verify(request).setAttribute("entity", expectedEntity);
     }
 
@@ -116,25 +103,25 @@ public class ParameterLoaderTest {
 		return parameters;
 	}
 
-	@Test 
+	@Test
     public void shouldLoadEntityUsingIdOfAnyType() throws Exception {
-    	
+
     	when(method.getMethod()).thenReturn(getMethod("other", OtherEntity.class, String.class));
     	Parameter[] mocks = mockParameters(Arrays.asList("entity", "ignored"));
 		when(provider.parametersFor(method.getMethod())).thenReturn(mocks);
-        
+
         when(request.getParameter("entity.id")).thenReturn("123");
         when(request.getParameter("ignored")).thenReturn("foo bar");
         OtherEntity expectedEntity = new OtherEntity();
         when(session.get(OtherEntity.class, "123")).thenReturn(expectedEntity);
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn("id");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(String.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
         verify(request).setAttribute("entity", expectedEntity);
     }
 
@@ -155,8 +142,8 @@ public class ParameterLoaderTest {
         when(classMetadata.getIdentifierPropertyName()).thenReturn("id");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
-        
-        parameterLoader.load(new ControllerFound(method));
+
+        parameterLoader.intercept(simpleInterceptorStack, method);
         assertThat(args[0], is((Object) expectedEntity));
 
         verify(flash).includeParameters(method, args);
@@ -167,14 +154,14 @@ public class ParameterLoaderTest {
     	Parameter[] mocks = mockParameters(Arrays.asList("entity"));
 		when(provider.parametersFor(method.getMethod())).thenReturn(mocks);
         when(request.getParameter("entity.id")).thenReturn(null);
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn("id");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
         verify(request, never()).setAttribute(eq("entity"), any());
         verify(result).notFound();
     }
@@ -185,14 +172,14 @@ public class ParameterLoaderTest {
 		when(provider.parametersFor(method.getMethod())).thenReturn(mocks);
         when(request.getParameter("entity.id")).thenReturn("123");
         when(session.get(Entity.class, 123l)).thenReturn(null);
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn("id");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
         verify(request, never()).setAttribute(eq("entity"), any());
         verify(result).notFound();
     }
@@ -203,15 +190,15 @@ public class ParameterLoaderTest {
     	Parameter[] mocks = mockParameters(Arrays.asList("entity"));
 		when(provider.parametersFor(method.getMethod())).thenReturn(mocks);
         when(request.getParameter("entity.id")).thenReturn("123");
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn(null);
-        
+
         fail().when(request).setAttribute(eq("entity"), any());
         fail().when(result).notFound();
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
     }
 
     @Test(expected=IllegalArgumentException.class)
@@ -223,14 +210,14 @@ public class ParameterLoaderTest {
         fail().when(request).setAttribute(eq("entity"), any());
         fail().when(result).notFound();
         fail().when(stack).next(method, instance);
-        
+
         when(session.getSessionFactory()).thenReturn(sessionFactory);
         when(sessionFactory.getClassMetadata(any(Class.class))).thenReturn(classMetadata);
         when(classMetadata.getIdentifierPropertyName()).thenReturn("id");
         when(classMetadata.getIdentifierType()).thenReturn(type);
         when(type.getReturnedClass()).thenReturn(Long.class);
 
-        parameterLoader.load(new ControllerFound(method));
+        parameterLoader.intercept(simpleInterceptorStack, method);
     }
 
 
